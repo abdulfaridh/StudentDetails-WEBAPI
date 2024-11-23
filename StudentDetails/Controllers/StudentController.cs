@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
+using StudentDetails.Data;
 using StudentDetails.model;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
@@ -10,19 +11,26 @@ namespace StudentDetails.Controllers
     [ApiController]
     public class StudentController : ControllerBase
     {
+        private StudentDBContext _dbContext;
+
+        public StudentController(StudentDBContext dBContext)
+        {
+            _dbContext = dBContext;
+        }
         [HttpGet]
         [Route("All", Name = "GetAllStudents")]
         public ActionResult<IEnumerable<Student>> GetStudents()
         {
             // Why we need DTO , it is not advisible to link the direct class that linked with the database , so we need DTOs.
             // using link queue we are creating link for the DTO 
-            var students = CollegeRepository.students.Select(s => new StudentDTO  //this link queue will help us to convert the students list into StudentDTO list
+            var students = _dbContext.Students.Select(s => new StudentDTO  //this link queue will help us to convert the students list into StudentDTO list
             {
                 Id = s.Id,
                 Name = s.Name,
                 EmailId = s.EmailId,
                 PhoneNumber = s.PhoneNumber,
                 Address = s.Address,
+                DOB = s.DOB,
             });
             // ok - 200 - sucess , we have predefined status codes , so we are using it to report about the status of the execution
             return Ok(students);
@@ -41,7 +49,7 @@ namespace StudentDetails.Controllers
 
             // if clent is searching foe the student thats not in the data , then we shouuld use :
 
-            var student = CollegeRepository.students.Where(n => n.Id == id).FirstOrDefault();
+            var student = _dbContext.Students.Where(n => n.Id == id).FirstOrDefault();
             if (student == null)
                 return NotFound($"student with id: {id} is not found"); // NotFound - 404 - client error
 
@@ -52,6 +60,7 @@ namespace StudentDetails.Controllers
                 EmailId = student.EmailId,
                 PhoneNumber = student.PhoneNumber,
                 Address = student.Address,
+                DOB = student.DOB,
             };
 
             // ok - 200
@@ -71,7 +80,7 @@ namespace StudentDetails.Controllers
             if (string.IsNullOrEmpty(name))
                 return BadRequest(); // badrequest - 400 - client error
 
-            var student = CollegeRepository.students.Where(n => n.Name == name).FirstOrDefault();
+            var student = _dbContext.Students.Where(n => n.Name == name).FirstOrDefault();
             if (student == null)
                 return NotFound($"The person named {name} is not found"); // NotFound - 404 - clinet error
 
@@ -82,6 +91,7 @@ namespace StudentDetails.Controllers
                 EmailId = student.EmailId,
                 PhoneNumber = student.PhoneNumber,
                 Address = student.Address,
+                DOB = student.DOB,
             };
 
             // ok - 200
@@ -96,25 +106,22 @@ namespace StudentDetails.Controllers
         [ProducesResponseType(500)]// Documenting the satus code : InternalServerError
         public ActionResult<StudentDTO> CreateStudent([FromBody] StudentDTO model)
         {
-            if (model.AdmissionDate < DateTime.Now)
-            {
-                ModelState.AddModelError("Admission error", "Admission Date is invalid");
-                return BadRequest(ModelState);
-            }
+           
             if (model == null)
                 return BadRequest();
-            int newId = CollegeRepository.students.LastOrDefault().Id + 1; // used to retrive the last student ID from the record and
-                                                                           // increment it by 1 to give new id to new student
+            
             Student student = new Student
             {
-                Id = newId,
+               
                 Name = model.Name,
 
                 EmailId = model.EmailId,
                 PhoneNumber = model.PhoneNumber,
                 Address = model.Address,
+               
             };
-            CollegeRepository.students.Add(student);
+            _dbContext.Students.Add(student);
+            _dbContext.SaveChanges();
 
             model.Id = student.Id; // after creation the new student ID will be updated to the model
 
@@ -139,7 +146,7 @@ namespace StudentDetails.Controllers
             {
                 return BadRequest();
             }
-            var ExsistingStudent = CollegeRepository.students.Where(s => s.Id == model.Id).FirstOrDefault();
+            var ExsistingStudent = _dbContext.Students.Where(s => s.Id == model.Id).FirstOrDefault();
 
             if (ExsistingStudent == null)
             {
@@ -150,6 +157,7 @@ namespace StudentDetails.Controllers
             ExsistingStudent.EmailId = model.EmailId;
             ExsistingStudent.Address = model.Address;
 
+            _dbContext.SaveChanges();
             return Ok();
         }
 
@@ -167,7 +175,7 @@ namespace StudentDetails.Controllers
                 return BadRequest();
 
 
-            var ExsistingStudent = CollegeRepository.students.Where(s => s.Id == id).FirstOrDefault();
+            var ExsistingStudent = _dbContext.Students.Where(s => s.Id == id).FirstOrDefault();
 
             if (ExsistingStudent == null)
             {
@@ -181,6 +189,7 @@ namespace StudentDetails.Controllers
                 EmailId = ExsistingStudent.EmailId,
                 Address = ExsistingStudent.Address,
                 PhoneNumber = ExsistingStudent.PhoneNumber,
+                DOB  = ExsistingStudent.DOB,
             };
 
             patchDocument.ApplyTo(StudentDTO,ModelState); // if there is no error it will be mapped to DTO
@@ -194,6 +203,8 @@ namespace StudentDetails.Controllers
             ExsistingStudent.Name = StudentDTO.Name;
             ExsistingStudent.EmailId = StudentDTO.EmailId;
             ExsistingStudent.Address = StudentDTO.Address;
+
+            _dbContext.SaveChanges();
 
             return NoContent();
 
@@ -213,11 +224,12 @@ namespace StudentDetails.Controllers
 
             // if clent is searching foe the student thats not in the data , then we shouuld use :
 
-            var student = CollegeRepository.students.Where(n => n.Id == id).FirstOrDefault();
+            var student = _dbContext.Students.Where(n => n.Id == id).FirstOrDefault();
             if (student == null)
                 return NotFound($"student with id: {id} is not found"); // NotFound - 404 - client error
 
-            CollegeRepository.students.Remove(student);
+            _dbContext.Students.Remove(student);
+            _dbContext.SaveChanges();
 
             // ok - 200
             return Ok(true); 

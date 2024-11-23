@@ -16,6 +16,6 @@ namespace StudentDetails.model
         public string PhoneNumber { get; set; }
      
         public string Address { get; set; }
-        public DateTime AdmissionDate { get; set; }
+        public DateTime DOB { get; set; }
     }
 }
